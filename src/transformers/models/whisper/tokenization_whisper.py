@@ -956,6 +956,9 @@ def _decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language,
         if return_timestamps == "word":
             token_timestamps = output["token_timestamps"][0].tolist()
 
+        if return_language:
+            last_language = tokenizer.decode(output['language'])[2:-2]
+
         # Those keep track of timestamps within strides
         # Which need to be skipped and resolve all tokens in a single
         # chunk.
@@ -1081,6 +1084,8 @@ def _decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language,
                         )
                         resolved_text = tokenizer.decode(resolved_tokens)
                         chunk["text"] = resolved_text
+                        if return_language:
+                            chunk["language"] = last_language
                         if return_timestamps == "word":
                             chunk["words"] = _collate_word_timestamps(
                                 tokenizer, resolved_tokens, resolved_token_timestamps, last_language, return_language
@@ -1133,6 +1138,8 @@ def _decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language,
         )
         resolved_text = tokenizer.decode(resolved_tokens)
         chunk["text"] = resolved_text
+        if return_language:
+            chunk["language"] = last_language
         if return_timestamps == "word":
             chunk["words"] = _collate_word_timestamps(
                 tokenizer, resolved_tokens, resolved_token_timestamps, last_language, return_language
