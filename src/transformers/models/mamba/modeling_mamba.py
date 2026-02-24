@@ -33,7 +33,7 @@ from ...utils import (
     auto_docstring,
     logging,
 )
-from ...utils.import_utils import is_mambapy_available, is_torchdynamo_compiling
+from ...utils.import_utils import is_mambapy_available, is_torchdynamo_compiling, resolve_internal_import
 from .configuration_mamba import MambaConfig
 
 
@@ -199,18 +199,16 @@ class MambaMixer(nn.Module):
 
         global causal_conv1d, causal_conv1d_update, causal_conv1d_fn
         causal_conv1d = lazy_load_kernel("causal-conv1d")
-        causal_conv1d_update, causal_conv1d_fn = (
-            (causal_conv1d.causal_conv1d_update, causal_conv1d.causal_conv1d_fn)
-            if causal_conv1d is not None
-            else (None, None)
-        )
+        causal_conv1d_update = getattr(causal_conv1d, "causal_conv1d_update", None)
+        causal_conv1d_fn = getattr(causal_conv1d, "causal_conv1d_fn", None)
+
         global mamba_ssm, selective_state_update, selective_scan_fn, mamba_inner_fn
         mamba_ssm = lazy_load_kernel("mamba-ssm")
-        selective_state_update, selective_scan_fn, mamba_inner_fn = (
-            (mamba_ssm.selective_state_update, mamba_ssm.selective_scan_fn, mamba_ssm.mamba_inner_fn)
-            if mamba_ssm is not None
-            else (None, None, None)
+        selective_state_update = resolve_internal_import(
+            mamba_ssm, chained_path="ops.triton.selective_state_update.selective_state_update"
         )
+        selective_scan_fn = getattr(mamba_ssm, "selective_scan_fn", None)
+        mamba_inner_fn = getattr(mamba_ssm, "mamba_inner_fn", None)
 
         self.warn_slow_implementation()
 
@@ -752,41 +750,33 @@ class MambaForCausalLM(MambaPreTrainedModel, GenerationMixin):
         is_first_iteration: bool | None = False,
         **kwargs,
     ):
-        # Overwritten -- uses `cache_params` as opposed to `past_key_values`
-        model_inputs = {"input_ids": input_ids.contiguous()}
+        # Overwritten -- has custom cache class `MambaCache`
+        model_inputs = super().prepare_inputs_for_generation(
+            input_ids,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            cache_params=cache_params,
+            cache_position=cache_position,
+            attention_mask=attention_mask,
+            is_first_iteration=is_first_iteration,
+            **kwargs,
+        )
+
         if use_cache and cache_params is None:
             # we initialize the `cache_position` to full size of `conv_states` at prefill stage
             # considering padding will be applied when input length is shorter, and truncation
             # will be applied when it is longer, so it will be equivalent to always have it match
             # the length of `cache_params.conv_states`, which is `config.conv_kernel`
-            cache_position = torch.arange(0, self.backbone.config.conv_kernel, device=input_ids.device)
+            model_inputs["cache_position"] = torch.arange(0, self.backbone.config.conv_kernel, device=input_ids.device)
             if inputs_embeds is not None:
-                model_inputs = {"inputs_embeds": inputs_embeds}
                 max_batch_size = inputs_embeds.size(0)
             else:
                 max_batch_size = input_ids.size(0)
-            cache_params = MambaCache(self.backbone.config, max_batch_size, device=self.device, dtype=self.dtype)
-
-        if use_cache and cache_position[0] > 0:
-            model_inputs["input_ids"] = input_ids[:, -1].unsqueeze(-1).contiguous()
-            attention_mask = None
-
-        if not use_cache and inputs_embeds is not None:
-            model_inputs = {"inputs_embeds": inputs_embeds}
-
-        model_inputs.update(
-            {
-                "cache_params": cache_params,
-                "use_cache": use_cache,
-                "cache_position": cache_position,
-                "attention_mask": attention_mask,
-            }
-        )
-
-        # Forward ALL kwargs that are uninitialized (e.g. `use_cache`).
-        for key, value in kwargs.items():
-            if key not in model_inputs:
-                model_inputs[key] = value
+            model_inputs["cache_params"] = MambaCache(
+                self.backbone.config, max_batch_size, device=self.device, dtype=self.dtype
+            )
+        elif use_cache and cache_position[0] > 0:
+            model_inputs["attention_mask"] = None
 
         return model_inputs
 
