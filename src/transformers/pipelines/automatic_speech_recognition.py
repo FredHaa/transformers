@@ -709,6 +709,7 @@ class AutomaticSpeechRecognitionPipeline(ChunkPipeline):
             output.pop("is_last", None)
             output.pop("stride", None)
             output.pop("token_timestamps", None)
+            output.pop("lang_id", None)
             for k, v in output.items():
                 extra[k].append(v)
         return {"text": text, **optional, **extra}
