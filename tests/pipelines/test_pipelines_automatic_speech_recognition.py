@@ -449,14 +449,14 @@ class AutomaticSpeechRecognitionPipelineTests(unittest.TestCase):
             {
                 "text": " Concord returned to its place amidst the tents.",
                 "chunks": [
-                    {"text": " Concord","timestamp": (0.0, 1.2),"language": "english",},
-                    {"text": " returned","timestamp": (1.2, 1.62),"language": "english",},
-                    {"text": " to", "timestamp": (1.62, 1.86), "language": "english"},
-                    {"text": " its", "timestamp": (1.86, 2.02), "language": "english"},
-                    {"text": " place","timestamp": (2.02, 2.28),"language": "english",},
-                    {"text": " amidst","timestamp": (2.28, 2.82),"language": "english",},
-                    {"text": " the", "timestamp": (2.82, 2.98), "language": "english"},
-                    {"text": " tents.","timestamp": (2.98, 3.48),"language": "english",},
+                    {"text": " Concord","timestamp": (1.04, 1.62),"language": "english",},
+                    {"text": " returned","timestamp": (1.62, 1.86),"language": "english",},
+                    {"text": " to", "timestamp": (1.86, 2.02), "language": "english"},
+                    {"text": " its", "timestamp": (2.02, 2.28), "language": "english"},
+                    {"text": " place","timestamp": (2.28, 2.64),"language": "english",},
+                    {"text": " amidst","timestamp": (2.64, 2.98),"language": "english",},
+                    {"text": " the", "timestamp": (2.98, 3.32), "language": "english"},
+                    {"text": " tents.","timestamp": (3.32, 3.48),"language": "english",},
                 ],
             },
         )
